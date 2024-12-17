@@ -24,6 +24,13 @@ To configure this plugin, add the following snippet to your vscode `settings.jso
 }
 ```
 
+# Installation
+1. [Download](https://github.com/Badbird5907/better-wakatime/releases/tag/24.9.2) the .vsix file from the GitHub Release
+2. Go to `Extensions > ...`
+![image](https://github.com/user-attachments/assets/f20423bd-1048-4f39-83e8-d77ff2195f54)
+4. Click on Install from VSIX
+5. Select the .vsix file you downloaded
+6. Profit.
 
 ----------
 
@@ -33,20 +40,6 @@ To configure this plugin, add the following snippet to your vscode `settings.jso
 [![WakaTime](https://wakatime.com/badge/github/wakatime/vscode-wakatime.png?style=flat-square&branch=master)](https://wakatime.com/badge/github/wakatime/vscode-wakatime)
 
 [WakaTime][wakatime] is an open source VS Code plugin for metrics, insights, and time tracking automatically generated from your programming activity.
-
-## Installation
-
-1. Press `F1` or `⌘ + Shift + P` and type `install`. Pick `Extensions: Install Extension`.
-
-   ![type install](./images/type-install.png)
-
-2. Type `wakatime` and hit `enter`.
-
-   ![type wakatime](./images/type-wakatime.png)
-
-3. Enter your [api key][api key], then press `enter`.
-
-   > (If you’re not prompted, press `F1` or `⌘ + Shift + P` then type `WakaTime API Key`.)
 
 4. Use VSCode and your coding activity will be displayed on your [WakaTime dashboard](https://wakatime.com)
 
