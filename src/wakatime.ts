@@ -331,9 +331,25 @@ export class WakaTime {
     // const url = (await this.options.getApiUrl(true)).replace('/api/v1', '').replace('://api.', '://');
     // vscode.env.openExternal(vscode.Uri.parse(url));
     const cfgs = await this.options.getApiConfigs();
-    cfgs.forEach(cfg => {
-      vscode.env.openExternal(vscode.Uri.parse(cfg.apiUrl.replace('/api/v1', '').replace('://api.', '://')));
+    if (cfgs.length === 0) return;
+    if (cfgs.length === 1) {
+      vscode.env.openExternal(vscode.Uri.parse(cfgs[0].apiUrl.replace('/api/v1', '').replace('://api.', '://')));
+      return;
+    }
+
+    const items = cfgs.map(cfg => ({
+      label: new URL(cfg.apiUrl).hostname,
+      url: cfg.apiUrl.replace('/api/v1', '').replace('://api.', '://')
+    }));
+
+    const selected = await vscode.window.showQuickPick(items, {
+      placeHolder: 'Select dashboard to open',
+      ignoreFocusOut: true
     });
+
+    if (selected) {
+      vscode.env.openExternal(vscode.Uri.parse(selected.url));
+    }
   }
 
   public openConfigFile(): void {
