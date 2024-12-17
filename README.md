@@ -30,7 +30,11 @@ To configure this plugin, add the following snippet to your vscode `settings.jso
 4. Click on Install from VSIX
 5. Select the .vsix file you downloaded
 6. Profit.
+
+
 ![image](https://github.com/user-attachments/assets/f20423bd-1048-4f39-83e8-d77ff2195f54)
+
+
 ----------
 
 
