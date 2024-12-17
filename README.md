@@ -6,6 +6,8 @@ This fork aims to fulfill two goals:
 1. Remove bloat/tech debt from the original WakaTime extension
 2. Add multi-server support.
 
+I do plan to create a completely custom plugin implementing the [API spec](https://wakatime.com/developers) when I have more time.
+
 [![Version](https://img.shields.io/visual-studio-marketplace/v/WakaTime.vscode-wakatime.png?style=flat-square&color=007ec6&label=marketplace)](https://marketplace.visualstudio.com/items?itemName=WakaTime.vscode-wakatime)
 [![Installs](https://img.shields.io/visual-studio-marketplace/i/WakaTime.vscode-wakatime.png?style=flat-square&color=007ec6)](https://marketplace.visualstudio.com/items?itemName=WakaTime.vscode-wakatime)
 [![WakaTime](https://wakatime.com/badge/github/wakatime/vscode-wakatime.png?style=flat-square&branch=master)](https://wakatime.com/badge/github/wakatime/vscode-wakatime)
