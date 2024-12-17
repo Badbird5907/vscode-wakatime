@@ -1,14 +1,9 @@
 import * as vscode from 'vscode';
 
 import {
-  COMMAND_API_KEY,
-  COMMAND_API_URL,
-  COMMAND_CONFIG_FILE,
   COMMAND_DASHBOARD,
   COMMAND_DEBUG,
   COMMAND_DISABLE,
-  COMMAND_LOG_FILE,
-  COMMAND_PROXY,
   COMMAND_STATUS_BAR_CODING_ACTIVITY,
   COMMAND_STATUS_BAR_ENABLED,
   LogLevel,
@@ -25,23 +20,23 @@ export function activate(ctx: vscode.ExtensionContext) {
 
   ctx.globalState?.setKeysForSync(['wakatime.apiKey']);
 
-  ctx.subscriptions.push(
-    vscode.commands.registerCommand(COMMAND_API_KEY, function () {
-      wakatime.promptForApiKey();
-    }),
-  );
+  // ctx.subscriptions.push(
+  //   vscode.commands.registerCommand(COMMAND_API_KEY, function () {
+  //     wakatime.promptForApiKey();
+  //   }),
+  // );
 
-  ctx.subscriptions.push(
-    vscode.commands.registerCommand(COMMAND_API_URL, function () {
-      wakatime.promptForApiUrl();
-    }),
-  );
+  // ctx.subscriptions.push(
+  //   vscode.commands.registerCommand(COMMAND_API_URL, function () {
+  //     wakatime.promptForApiUrl();
+  //   }),
+  // );
 
-  ctx.subscriptions.push(
-    vscode.commands.registerCommand(COMMAND_PROXY, function () {
-      wakatime.promptForProxy();
-    }),
-  );
+  // ctx.subscriptions.push(
+  //   vscode.commands.registerCommand(COMMAND_PROXY, function () {
+  //     wakatime.promptForProxy();
+  //   }),
+  // );
 
   ctx.subscriptions.push(
     vscode.commands.registerCommand(COMMAND_DEBUG, function () {
@@ -73,17 +68,17 @@ export function activate(ctx: vscode.ExtensionContext) {
     }),
   );
 
-  ctx.subscriptions.push(
-    vscode.commands.registerCommand(COMMAND_CONFIG_FILE, function () {
-      wakatime.openConfigFile();
-    }),
-  );
+  // ctx.subscriptions.push(
+  //   vscode.commands.registerCommand(COMMAND_CONFIG_FILE, function () {
+  //     wakatime.openConfigFile();
+  //   }),
+  // );
 
-  ctx.subscriptions.push(
-    vscode.commands.registerCommand(COMMAND_LOG_FILE, function () {
-      wakatime.openLogFile();
-    }),
-  );
+  // ctx.subscriptions.push(
+  //   vscode.commands.registerCommand(COMMAND_LOG_FILE, function () {
+  //     wakatime.openLogFile();
+  //   }),
+  // );
 
   ctx.subscriptions.push(wakatime);
 

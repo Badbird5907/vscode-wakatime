@@ -1,5 +1,4 @@
 // import * as azdata from 'azdata';
-import * as child_process from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
@@ -51,8 +50,6 @@ export class WakaTime {
   private currentlyFocusedFile: string;
   private teamDevsForFileCache = {};
   private resourcesLocation: string;
-  private lastApiKeyPrompted: number = 0;
-  private isMetricsEnabled: boolean = false;
 
   constructor(extensionPath: string, logger: Logger) {
     this.extensionPath = extensionPath;
@@ -66,27 +63,27 @@ export class WakaTime {
       if (setting.value === 'true') {
         this.logger.setLevel(LogLevel.DEBUG);
       }
-      this.options.getSetting('settings', 'metrics', false, (metrics: Setting) => {
-        if (metrics.value === 'true') {
-          this.isMetricsEnabled = true;
+      // this.options.getSetting('settings', 'metrics', false, (metrics: Setting) => {
+      //   if (metrics.value === 'true') {
+      //     this.isMetricsEnabled = true;
+      //   }
+
+      this.dependencies = new Dependencies(this.options, this.logger, this.resourcesLocation);
+
+      let extension = vscode.extensions.getExtension('WakaTime.vscode-wakatime');
+      this.extension = (extension != undefined && extension.packageJSON) || { version: '0.0.0' };
+      this.agentName = Utils.getEditorName();
+
+      this.options.getSetting('settings', 'disabled', false, (disabled: Setting) => {
+        this.disabled = disabled.value === 'true';
+        if (this.disabled) {
+          this.dispose();
+          return;
         }
 
-        this.dependencies = new Dependencies(this.options, this.logger, this.resourcesLocation);
-
-        let extension = vscode.extensions.getExtension('WakaTime.vscode-wakatime');
-        this.extension = (extension != undefined && extension.packageJSON) || { version: '0.0.0' };
-        this.agentName = Utils.getEditorName();
-
-        this.options.getSetting('settings', 'disabled', false, (disabled: Setting) => {
-          this.disabled = disabled.value === 'true';
-          if (this.disabled) {
-            this.dispose();
-            return;
-          }
-
-          this.initializeDependencies();
-        });
+        this.initializeDependencies();
       });
+      // });
     });
   }
 
@@ -144,8 +141,6 @@ export class WakaTime {
           this.showStatusBar = statusBarEnabled.value !== 'false';
           this.setStatusBarVisibility(this.showStatusBar);
           this.updateStatusBarText('WakaTime Initializing...');
-
-          this.checkApiKey();
 
           this.setupEventListeners();
 
@@ -215,42 +210,6 @@ export class WakaTime {
   private updateStatusBarTooltipForOther(tooltipText: string): void {
     if (!this.statusBarTeamOther) return;
     this.statusBarTeamOther.tooltip = tooltipText;
-  }
-
-  public async promptForApiKey(hidden: boolean = true): Promise<void> {
-    let defaultVal = await this.options.getApiKey();
-    if (Utils.apiKeyInvalid(defaultVal ?? undefined)) defaultVal = '';
-    let promptOptions = {
-      prompt: 'WakaTime Api Key',
-      placeHolder: 'Enter your api key from https://wakatime.com/api-key',
-      value: defaultVal!,
-      ignoreFocusOut: true,
-      password: hidden,
-      validateInput: Utils.apiKeyInvalid.bind(this),
-    };
-    vscode.window.showInputBox(promptOptions).then((val) => {
-      if (val != undefined) {
-        let invalid = Utils.apiKeyInvalid(val);
-        if (!invalid) {
-          this.options.setSetting('settings', 'api_key', val, false);
-        } else vscode.window.setStatusBarMessage(invalid);
-      } else vscode.window.setStatusBarMessage('WakaTime api key not provided');
-    });
-  }
-
-  public async promptForApiUrl(): Promise<void> {
-    const apiUrl = await this.options.getApiUrl(true);
-    let promptOptions = {
-      prompt: 'WakaTime Api Url (Defaults to https://api.wakatime.com/api/v1)',
-      placeHolder: 'https://api.wakatime.com/api/v1',
-      value: apiUrl,
-      ignoreFocusOut: true,
-    };
-    vscode.window.showInputBox(promptOptions).then((val) => {
-      if (val) {
-        this.options.setSetting('settings', 'api_url', val, false);
-      }
-    });
   }
 
   public promptForProxy(): void {
@@ -369,8 +328,12 @@ export class WakaTime {
   }
 
   public async openDashboardWebsite(): Promise<void> {
-    const url = (await this.options.getApiUrl(true)).replace('/api/v1', '').replace('://api.', '://');
-    vscode.env.openExternal(vscode.Uri.parse(url));
+    // const url = (await this.options.getApiUrl(true)).replace('/api/v1', '').replace('://api.', '://');
+    // vscode.env.openExternal(vscode.Uri.parse(url));
+    const cfgs = await this.options.getApiConfigs();
+    cfgs.forEach(cfg => {
+      vscode.env.openExternal(vscode.Uri.parse(cfg.apiUrl.replace('/api/v1', '').replace('://api.', '://')));
+    });
   }
 
   public openConfigFile(): void {
@@ -387,12 +350,6 @@ export class WakaTime {
       let uri = vscode.Uri.file(path);
       vscode.window.showTextDocument(uri);
     }
-  }
-
-  private checkApiKey(): void {
-    this.options.hasApiKey((hasApiKey) => {
-      if (!hasApiKey) this.promptForApiKey();
-    });
   }
 
   private setStatusBarVisibility(isVisible: boolean): void {
@@ -508,7 +465,19 @@ export class WakaTime {
       }
     }, this.debounceMs);
   }
-
+  private getOperatingSystem(): string | null {
+    const platform = process.platform;
+    if (platform === 'darwin') return 'Mac';
+    if (platform === 'win32') return 'Windows';
+    if (platform === 'linux') return 'Linux';
+    return platform;
+  }
+  private getPlugin(): string {
+    const agent = `${this.agentName}/${vscode.version} vscode-wakatime/${this.extension.version}`;
+    const os = this.getOperatingSystem();
+    if (os) return `(${os}) ${agent}`;
+    return agent;
+  }
   private async sendHeartbeat(
     doc: vscode.TextDocument,
     time: number,
@@ -517,24 +486,6 @@ export class WakaTime {
     isCompiling: boolean,
     isDebugging: boolean,
   ): Promise<void> {
-    const apiKey = await this.options.getApiKey();
-    if (apiKey) {
-      await this._sendHeartbeat(doc, time, selection, isWrite, isCompiling, isDebugging);
-    } else {
-      await this.promptForApiKey();
-    }
-  }
-
-  private async _sendHeartbeat(
-    doc: vscode.TextDocument,
-    time: number,
-    selection: vscode.Position,
-    isWrite: boolean,
-    isCompiling: boolean,
-    isDebugging: boolean,
-  ): Promise<void> {
-    if (!this.dependencies.isCliInstalled()) return;
-
     let file = doc.fileName;
     if (Utils.isRemoteUri(doc.uri)) {
       file = `${doc.uri.authority}${doc.uri.path}`;
@@ -545,104 +496,95 @@ export class WakaTime {
     // prevent sending the same heartbeat (https://github.com/wakatime/vscode-wakatime/issues/163)
     if (isWrite && this.isDuplicateHeartbeat(file, time, selection)) return;
 
-    let args: string[] = [];
-
-    args.push('--entity', Utils.quote(file));
-
-    let user_agent =
-      this.agentName + '/' + vscode.version + ' vscode-wakatime/' + this.extension.version;
-    args.push('--plugin', Utils.quote(user_agent));
-
-    args.push('--lineno', String(selection.line + 1));
-    args.push('--cursorpos', String(selection.character + 1));
-    args.push('--lines-in-file', String(doc.lineCount));
-    if (isDebugging) {
-      args.push('--category', 'debugging');
-    } else if (isCompiling) {
-      args.push('--category', 'building');
-    } else if (Utils.isPullRequest(doc.uri)) {
-      args.push('--category', 'code reviewing');
-    }
-
-    if (this.isMetricsEnabled) args.push('--metrics');
-
-    const apiKey = this.options.getApiKeyFromEnv();
-    if (!Utils.apiKeyInvalid(apiKey)) args.push('--key', Utils.quote(apiKey));
-
-    const apiUrl = await this.options.getApiUrl();
-    if (apiUrl) args.push('--api-url', Utils.quote(apiUrl));
+    const payload = {
+      type: 'file',
+      entity: file,
+      time: Date.now() / 1000,
+      lineno: selection.line + 1,
+      cursorpos: selection.character + 1,
+      lines: doc.lineCount,
+      is_write: isWrite,
+      plugin: this.getPlugin(),
+    };
+    this.logger.debug(`Sending heartbeat: ${JSON.stringify(payload)}`);
 
     const project = this.getProjectName(doc.uri);
-    if (project) args.push('--alternate-project', Utils.quote(project));
+    if (project) payload['project'] = project;
+
+    const language = doc.languageId ?? "";
+    if (language) payload['language'] = language;
 
     const folder = this.getProjectFolder(doc.uri);
-    if (folder) args.push('--project-folder', Utils.quote(folder));
-
-    if (isWrite) args.push('--write');
-
-    if (Desktop.isWindows() || Desktop.isPortable()) {
-      args.push(
-        '--config',
-        Utils.quote(this.options.getConfigFile(false)),
-        '--log-file',
-        Utils.quote(this.options.getLogFile()),
-      );
+    if (folder && file.indexOf(folder) === 0) {
+      payload['project_root_count'] = this.countSlashesInPath(folder);
     }
 
-    if (doc.isUntitled) args.push('--is-unsaved-entity');
+    if (isDebugging) {
+      payload['category'] = 'debugging';
+    } else if (isCompiling) {
+      payload['category'] = 'building';
+    } else if (Utils.isPullRequest(doc.uri)) {
+      payload['category'] = 'code reviewing';
+    }
 
-    const binary = this.dependencies.getCliLocation();
-    this.logger.debug(`Sending heartbeat: ${Utils.formatArguments(binary, args)}`);
-    const options = Desktop.buildOptions();
-    let proc = child_process.execFile(binary, args, options, (error, stdout, stderr) => {
-      if (error != null) {
-        if (stderr && stderr.toString() != '') this.logger.error(stderr.toString());
-        if (stdout && stdout.toString() != '') this.logger.error(stdout.toString());
-        this.logger.error(error.toString());
+    this.logger.debug(`Sending heartbeat: ${JSON.stringify(payload)}`);
+
+    const apiConfigs = await this.options.getApiConfigs();
+    const promises = apiConfigs.map(async ({apiUrl, apiKey}) => {
+      const url = `${apiUrl}/users/current/heartbeats?api_key=${apiKey}`;
+      this.logger.debug(` |-> Sending heartbeat to ${url}`);
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Machine-Name': vscode.env.appHost,
+          },
+          body: JSON.stringify(payload),
+        }).catch((e) => {
+          this.logger.error(`[03] API Error: ${e}`);
+          throw e;
+        });
+        const resp = await response.text();
+        this.logger.debug(`API Response: ${resp}`);
+        const parsedJSON = JSON.parse(resp); // await response.json();
+        if (response.status == 200 || response.status == 201 || response.status == 202) {
+          if (this.showStatusBar) this.getCodingActivity();
+        } else {
+          this.logger.warn(`[01] API Error ${response.status}: ${parsedJSON}`);
+          if (response && response.status == 401) {
+            let error_msg = 'Invalid WakaTime Api Key [@${apiUrl}]';
+            if (this.showStatusBar) {
+              this.updateStatusBarText('WakaTime Error');
+              this.updateStatusBarTooltip(`WakaTime: ${error_msg} @ ${apiUrl}`);
+            }
+            this.logger.error(error_msg);
+            // let now: number = Date.now();
+            // if (this.lastApiKeyPrompted < now - 86400000) {
+            //   // only prompt once per day
+            //   this.promptForApiKey(false);
+            //   this.lastApiKeyPrompted = now;
+            // }
+          } else {
+            let error_msg = `Error sending heartbeat (${response.status}); Check your browser console for more details.`;
+            if (this.showStatusBar) {
+              this.updateStatusBarText('WakaTime Error');
+              this.updateStatusBarTooltip(`WakaTime: ${error_msg}`);
+            }
+            this.logger.error(error_msg);
+          }
+        }
+      } catch (ex) {
+        this.logger.warn(`[02] API Error: ${ex}`);
+        let error_msg = `Error sending heartbeat; Check your browser console for more details.`;
+        if (this.showStatusBar) {
+          this.updateStatusBarText('WakaTime Error');
+          this.updateStatusBarTooltip(`WakaTime: ${error_msg}`);
+        }
+        this.logger.error(error_msg);
       }
     });
-    proc.on('close', async (code, _signal) => {
-      if (code == 0) {
-        if (this.showStatusBar) this.getCodingActivity();
-      } else if (code == 102 || code == 112) {
-        if (this.showStatusBar) {
-          if (!this.showCodingActivity) this.updateStatusBarText();
-          this.updateStatusBarTooltip(
-            'WakaTime: working offline... coding activity will sync next time we are online',
-          );
-        }
-        this.logger.warn(
-          `Working offline (${code}); Check your ${this.options.getLogFile()} file for more details`,
-        );
-      } else if (code == 103) {
-        let error_msg = `Config parsing error (103); Check your ${this.options.getLogFile()} file for more details`;
-        if (this.showStatusBar) {
-          this.updateStatusBarText('WakaTime Error');
-          this.updateStatusBarTooltip(`WakaTime: ${error_msg}`);
-        }
-        this.logger.error(error_msg);
-      } else if (code == 104) {
-        let error_msg = 'Invalid Api Key (104); Make sure your Api Key is correct!';
-        if (this.showStatusBar) {
-          this.updateStatusBarText('WakaTime Error');
-          this.updateStatusBarTooltip(`WakaTime: ${error_msg}`);
-        }
-        this.logger.error(error_msg);
-        let now: number = Date.now();
-        if (this.lastApiKeyPrompted < now - 86400000) {
-          // only prompt once per day
-          await this.promptForApiKey(false);
-          this.lastApiKeyPrompted = now;
-        }
-      } else {
-        let error_msg = `Unknown Error (${code}); Check your ${this.options.getLogFile()} file for more details`;
-        if (this.showStatusBar) {
-          this.updateStatusBarText('WakaTime Error');
-          this.updateStatusBarTooltip(`WakaTime: ${error_msg}`);
-        }
-        this.logger.error(error_msg);
-      }
-    });
+    await Promise.all(promises);
   }
 
   private async getCodingActivity() {
@@ -653,110 +595,77 @@ export class WakaTime {
 
     this.lastFetchToday = Date.now();
 
-    const apiKey = await this.options.getApiKey();
-    if (!apiKey) return;
+    const apiConfigs = await this.options.getApiConfigs();
+    if (!apiConfigs) return;
 
     await this._getCodingActivity();
   }
 
   private async _getCodingActivity() {
-    if (!this.dependencies.isCliInstalled()) return;
-
-    let user_agent =
-      this.agentName + '/' + vscode.version + ' vscode-wakatime/' + this.extension.version;
-    let args = ['--today', '--output', 'json', '--plugin', Utils.quote(user_agent)];
-
-    if (this.isMetricsEnabled) args.push('--metrics');
-
-    const apiKey = this.options.getApiKeyFromEnv();
-    if (!Utils.apiKeyInvalid(apiKey)) args.push('--key', Utils.quote(apiKey));
-
-    const apiUrl = await this.options.getApiUrl();
-    if (apiUrl) args.push('--api-url', Utils.quote(apiUrl));
-
-    if (Desktop.isWindows()) {
-      args.push(
-        '--config',
-        Utils.quote(this.options.getConfigFile(false)),
-        '--logfile',
-        Utils.quote(this.options.getLogFile()),
-      );
-    }
-
-    const binary = this.dependencies.getCliLocation();
-    this.logger.debug(
-      `Fetching coding activity for Today from api: ${Utils.formatArguments(binary, args)}`,
-    );
-    const options = Desktop.buildOptions();
-
-    try {
-      let proc = child_process.execFile(binary, args, options, (error, stdout, stderr) => {
-        if (error != null) {
-          if (stderr && stderr.toString() != '') this.logger.debug(stderr.toString());
-          if (stdout && stdout.toString() != '') this.logger.debug(stdout.toString());
-          this.logger.debug(error.toString());
-        }
-      });
-      let output = '';
-      if (proc.stdout) {
-        proc.stdout.on('data', (data: string | null) => {
-          if (data) output += data;
+    this.logger.debug('Fetching coding activity for Today from api.');
+    const apiConfigs = await this.options.getApiConfigs();
+    const promises = apiConfigs.map(async ({apiUrl, apiKey}) => {
+      const url = `${apiUrl}/users/current/statusbar/today?api_key=${apiKey}`;
+      try {
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent':
+              this.agentName + '/' + vscode.version + ' vscode-wakatime/' + this.extension.version,
+          },
         });
-      }
-      proc.on('close', (code, _signal) => {
-        if (code == 0) {
+        const parsedJSON = await response.json();
+        if (response.status == 200) {
           if (this.showStatusBar) {
-            if (output) {
-              let jsonData: any;
-              try {
-                jsonData = JSON.parse(output);
-              } catch (e) {
-                this.logger.debug(
-                  `Error parsing today coding activity as json:\n${output}\nCheck your ${this.options.getLogFile()} file for more details.`,
+            if (parsedJSON.data) this.hasTeamFeatures = parsedJSON.data.has_team_features;
+            let output = parsedJSON.data.grand_total.text;
+            if (
+              await this.options.getSettingAsync("settings", "wakatime.status_bar_hide_categories") != 'true' &&
+              parsedJSON.data.categories.length > 1
+            ) {
+              output = parsedJSON.data.categories.map((x) => x.text + ' ' + x.name).join(', ');
+            }
+            if (output && output.trim()) {
+              if (this.showCodingActivity) {
+                this.updateStatusBarText(output.trim());
+                this.updateStatusBarTooltip(
+                  'WakaTime: Today’s coding time. Click to visit dashboard.',
                 );
-              }
-              if (jsonData) this.hasTeamFeatures = jsonData?.has_team_features;
-              if (jsonData?.text) {
-                if (this.showCodingActivity) {
-                  this.updateStatusBarText(jsonData.text.trim());
-                  this.updateStatusBarTooltip(
-                    'WakaTime: Today’s coding time. Click to visit dashboard.',
-                  );
-                } else {
-                  this.updateStatusBarText();
-                  this.updateStatusBarTooltip(jsonData.text.trim());
-                }
               } else {
                 this.updateStatusBarText();
-                this.updateStatusBarTooltip(
-                  'WakaTime: Calculating time spent today in background...',
-                );
+                this.updateStatusBarTooltip(output.trim());
               }
-              this.updateTeamStatusBar();
             } else {
               this.updateStatusBarText();
-              this.updateStatusBarTooltip(
-                'WakaTime: Calculating time spent today in background...',
-              );
+              this.updateStatusBarTooltip('WakaTime: Calculating time spent today in background...');
             }
+            this.updateTeamStatusBar();
           }
-        } else if (code == 102 || code == 112) {
-          // noop, working offline
         } else {
-          this.logger.debug(
-            `Error fetching today coding activity (${code}); Check your ${this.options.getLogFile()} file for more details.`,
-          );
+          this.logger.warn(`API Error ${response.status}: ${parsedJSON}`);
+          if (response && response.status == 401) {
+            let error_msg = 'Invalid WakaTime Api Key';
+            if (this.showStatusBar) {
+              this.updateStatusBarText('WakaTime Error');
+              this.updateStatusBarTooltip(`WakaTime: ${error_msg}`);
+            }
+            this.logger.error(error_msg);
+          } else {
+            let error_msg = `Error fetching code stats for status bar (${response.status}); Check your browser console for more details.`;
+            this.logger.debug(error_msg);
+          }
         }
-      });
-    } catch (e) {
-      this.logger.debugException(e);
-    }
+      } catch (ex) {
+        this.logger.warn(`API Error: ${ex}`);
+      }
+    });
+    await Promise.all(promises);
   }
 
   private async updateTeamStatusBar(doc?: vscode.TextDocument) {
     if (!this.showStatusBarTeam) return;
     if (!this.hasTeamFeatures) return;
-    if (!this.dependencies.isCliInstalled()) return;
 
     if (!doc) {
       doc = vscode.window.activeTextEditor?.document;
@@ -772,98 +681,83 @@ export class WakaTime {
 
     this.currentlyFocusedFile = file;
 
-    // TODO: expire cached text after some hours
     if (this.teamDevsForFileCache[file]) {
       this.updateTeamStatusBarFromJson(this.teamDevsForFileCache[file]);
       return;
     }
 
-    let user_agent =
-      this.agentName + '/' + vscode.version + ' vscode-wakatime/' + this.extension.version;
-    let args = ['--output', 'json', '--plugin', Utils.quote(user_agent)];
+    this.logger.debug('Fetching devs for currently focused file from api.');
+    const apiConfigs = await this.options.getApiConfigs();
+    const promises = apiConfigs.map(async ({apiUrl, apiKey}) => {
+      const url = `${apiUrl}/users/current/file_experts?api_key=${apiKey}`;
 
-    args.push('--file-experts', Utils.quote(file));
-
-    args.push('--entity', Utils.quote(file));
-
-    if (this.isMetricsEnabled) args.push('--metrics');
-
-    const apiKey = this.options.getApiKeyFromEnv();
-    if (!Utils.apiKeyInvalid(apiKey)) args.push('--key', Utils.quote(apiKey));
-
-    const apiUrl = await this.options.getApiUrl();
-    if (apiUrl) args.push('--api-url', Utils.quote(apiUrl));
-
-    const project = this.getProjectName(doc.uri);
-    if (project) args.push('--alternate-project', Utils.quote(project));
-
-    const folder = this.getProjectFolder(doc.uri);
-    if (folder) args.push('--project-folder', Utils.quote(folder));
-
-    if (Desktop.isWindows()) {
-      args.push(
-        '--config',
-        Utils.quote(this.options.getConfigFile(false)),
-        '--logfile',
-        Utils.quote(this.options.getLogFile()),
-      );
-    }
-
-    if (doc.isUntitled) args.push('--is-unsaved-entity');
-
-    const binary = this.dependencies.getCliLocation();
-    this.logger.debug(`Fetching devs for file from api: ${Utils.formatArguments(binary, args)}`);
-    const options = Desktop.buildOptions();
-
-    try {
-      let proc = child_process.execFile(binary, args, options, (error, stdout, stderr) => {
-        if (error != null) {
-          if (stderr && stderr.toString() != '') this.logger.debug(stderr.toString());
-          if (stdout && stdout.toString() != '') this.logger.debug(stdout.toString());
-          this.logger.debug(error.toString());
-        }
-      });
-      let output = '';
-      if (proc.stdout) {
-        proc.stdout.on('data', (data: string | null) => {
-          if (data) output += data;
+      const payload = {
+        entity: file,
+        plugin: this.agentName + '/' + vscode.version + ' vscode-wakatime/' + this.extension.version,
+      };
+  
+      const project = this.getProjectName(doc!.uri);
+      if (!project) return;
+      payload['project'] = project;
+  
+      const folder = this.getProjectFolder(doc!.uri);
+      if (!folder || file.indexOf(folder) !== 0) return;
+      payload['project_root_count'] = this.countSlashesInPath(folder);
+  
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent':
+              this.agentName + '/' + vscode.version + ' vscode-wakatime/' + this.extension.version,
+          },
+          body: JSON.stringify(payload),
         });
-      }
-      proc.on('close', (code, _signal) => {
-        if (code == 0) {
-          if (output && output.trim()) {
-            let jsonData;
-            try {
-              jsonData = JSON.parse(output);
-            } catch (e) {
-              this.logger.debug(
-                `Error parsing devs for file as json:\n${output}\nCheck your ${this.options.getLogFile()} file for more details.`,
-              );
+        const parsedJSON = await response.json();
+        if (response.status == 200) {
+          const devs = {
+            you: null,
+            other: null,
+          };
+          if (parsedJSON.data) {
+            const currentUser = parsedJSON.data.find((dev) => dev.user.is_current_user);
+            let topDev = parsedJSON.data[0];
+            if (topDev.user.is_current_user) {
+              if (parsedJSON.data.length > 1) {
+                topDev = parsedJSON.data[1];
+              } else {
+                topDev = null;
+              }
             }
-
-            if (jsonData) this.teamDevsForFileCache[file!] = jsonData;
-
-            // make sure this file is still the currently focused file
-            if (file !== this.currentlyFocusedFile) {
-              return;
-            }
-
-            this.updateTeamStatusBarFromJson(jsonData);
-          } else {
-            this.updateTeamStatusBarTextForCurrentUser();
-            this.updateTeamStatusBarTextForOther();
+  
+            devs.you = currentUser;
+            devs.other = topDev;
+            this.teamDevsForFileCache[file] = devs;
           }
-        } else if (code == 102 || code == 112) {
-          // noop, working offline
+  
+          // make sure this file is still the currently focused file
+          if (file !== this.currentlyFocusedFile) return;
+  
+          if (this.showStatusBar) {
+            this.updateTeamStatusBarFromJson(devs);
+          }
         } else {
-          this.logger.debug(
-            `Error fetching devs for file (${code}); Check your ${this.options.getLogFile()} file for more details.`,
-          );
+          this.updateTeamStatusBarTextForCurrentUser();
+          this.updateTeamStatusBarTextForOther();
+          this.logger.warn(`API Error ${response.status}: ${parsedJSON}`);
+          if (response && response.status == 401) {
+            this.logger.error('Invalid WakaTime Api Key');
+          } else {
+            let error_msg = `Error fetching devs for currently focused file (${response.status}); Check your browser console for more details.`;
+            this.logger.debug(error_msg);
+          }
         }
-      });
-    } catch (e) {
-      this.logger.debugException(e);
-    }
+      } catch (ex) {
+        this.logger.warn(`API Error: ${ex}`);
+      }
+    });
+    await Promise.all(promises);
   }
 
   private updateTeamStatusBarFromJson(jsonData?: any) {
@@ -941,5 +835,21 @@ export class WakaTime {
       return vscode.workspace.workspaceFolders[0].uri.fsPath;
     }
     return '';
+  }
+
+  private countSlashesInPath(path: string): number {
+    if (!path) return 0;
+
+    const windowsNetDrive = path.indexOf('\\\\') === 0;
+
+    path = path.replace(/[\\/]+/, '/');
+
+    if (windowsNetDrive) {
+      path = '\\\\' + path.slice(1);
+    }
+
+    if (!path.endsWith('/')) path = path + '/';
+
+    return (path.match(/\//g) || []).length;
   }
 }

@@ -5,12 +5,11 @@ import * as vscode from 'vscode';
 
 import { Desktop } from './desktop';
 import { Logger } from './logger';
-import { Utils } from './utils';
 
 export interface Setting {
   key: string;
   value: string;
-  error?: string;
+  error?: string;x
 }
 
 export class Options {
@@ -202,45 +201,6 @@ export class Options {
     return this.logFile;
   }
 
-  public async getApiKey(): Promise<string> {
-    if (!Utils.apiKeyInvalid(this.cache.api_key)) {
-      return this.cache.api_key;
-    }
-
-    const keyFromSettings = this.getApiKeyFromEditor();
-    if (!Utils.apiKeyInvalid(keyFromSettings)) {
-      this.cache.api_key = keyFromSettings;
-      return this.cache.api_key;
-    }
-
-    const keyFromEnv = this.getApiKeyFromEnv();
-    if (!Utils.apiKeyInvalid(keyFromEnv)) {
-      this.cache.api_key = keyFromEnv;
-      return this.cache.api_key;
-    }
-
-    try {
-      const apiKeyFromVault = await this.getApiKeyFromVaultCmd();
-      if (!Utils.apiKeyInvalid(apiKeyFromVault)) {
-        this.cache.api_key = apiKeyFromVault;
-        return this.cache.api_key;
-      }
-    } catch (err) {}
-
-    try {
-      const apiKey = await this.getSettingAsync<string>('settings', 'api_key');
-      if (!Utils.apiKeyInvalid(apiKey)) this.cache.api_key = apiKey;
-      return apiKey;
-    } catch (err) {
-      this.logger.debug(`Exception while reading API Key from config file: ${err}`);
-      if (`${err}`.includes('spawn EPERM')) {
-        vscode.window.showErrorMessage(
-          'Microsoft Defender is blocking WakaTime. Please allow WakaTime to run so it can upload code stats to your dashboard.',
-        );
-      }
-      return '';
-    }
-  }
 
   public async getApiKeyFromVaultCmd(): Promise<string> {
     try {
@@ -279,15 +239,6 @@ export class Options {
       return '';
     }
   }
-
-  private getApiKeyFromEditor(): string {
-    return vscode.workspace.getConfiguration().get('wakatime.apiKey') || '';
-  }
-
-  private getApiUrlFromEditor(): string {
-    return vscode.workspace.getConfiguration().get('wakatime.apiUrl') || '';
-  }
-
   // Support for gitpod.io https://github.com/wakatime/vscode-wakatime/pull/220
   public getApiKeyFromEnv(): string {
     if (this.cache.api_key_from_env !== undefined) return this.cache.api_key_from_env;
@@ -297,52 +248,23 @@ export class Options {
     return this.cache.api_key_from_env;
   }
 
-  public async getApiUrl(checkSettingsFile = false): Promise<string> {
-    let apiUrl = this.getApiUrlFromEditor();
-
-    if (!apiUrl) {
-      apiUrl = this.getApiUrlFromEnv();
-    }
-
-    if (!apiUrl && !checkSettingsFile) {
-      return '';
-    }
-
-    if (!apiUrl) {
-      try {
-        apiUrl = await this.getSettingAsync<string>('settings', 'api_url');
-      } catch (err) {
-        this.logger.debug(`Exception while reading API Url from config file: ${err}`);
-      }
-    }
-
-    if (!apiUrl) apiUrl = 'https://api.wakatime.com/api/v1';
-
+  private normalizeApiUrl(apiUrl: string): string {
     const suffixes = ['/', '.bulk', '/users/current/heartbeats', '/heartbeats', '/heartbeat'];
     for (const suffix of suffixes) {
       if (apiUrl.endsWith(suffix)) {
         apiUrl = apiUrl.slice(0, -suffix.length);
       }
     }
-
     return apiUrl;
   }
 
-  private getApiUrlFromEnv(): string {
-    if (this.cache.api_url_from_env !== undefined) return this.cache.api_url_from_env;
-
-    this.cache.api_url_from_env = process.env.WAKATIME_API_URL || '';
-
-    return this.cache.api_url_from_env;
-  }
-
-  public hasApiKey(callback: (valid: boolean) => void): void {
-    this.getApiKey()
-      .then((apiKey) => callback(!Utils.apiKeyInvalid(apiKey)))
-      .catch((err) => {
-        this.logger.warn(`Unable to check for api key: ${err}`);
-        callback(false);
-      });
+  public async getApiConfigs(): Promise<{apiUrl: string, apiKey: string}[]> {
+    return (vscode.workspace.getConfiguration("wakatime").get('apiConfig') as {apiUrl: string, apiKey: string}[] ?? []).map((config) => {
+      return {
+        apiUrl: this.normalizeApiUrl(config.apiUrl),
+        apiKey: config.apiKey
+      };
+    });
   }
 
   private startsWith(outer: string, inner: string): boolean {

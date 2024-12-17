@@ -1,8 +1,6 @@
 import * as vscode from 'vscode';
 
 import {
-  COMMAND_API_KEY,
-  COMMAND_API_URL,
   COMMAND_DASHBOARD,
   COMMAND_DEBUG,
   COMMAND_DISABLE,
@@ -20,19 +18,19 @@ var wakatime: WakaTime;
 export function activate(ctx: vscode.ExtensionContext) {
   wakatime = new WakaTime(logger, ctx.globalState);
 
-  ctx.globalState?.setKeysForSync(['wakatime.apiKey']);
+  ctx.globalState?.setKeysForSync(['wakatime.apiConfig']);
+  
+  // ctx.subscriptions.push(
+  //   vscode.commands.registerCommand(COMMAND_API_KEY, function () {
+  //     wakatime.promptForApiKey();
+  //   }),
+  // );
 
-  ctx.subscriptions.push(
-    vscode.commands.registerCommand(COMMAND_API_KEY, function () {
-      wakatime.promptForApiKey();
-    }),
-  );
-
-  ctx.subscriptions.push(
-    vscode.commands.registerCommand(COMMAND_API_URL, function () {
-      wakatime.promptForApiUrl();
-    }),
-  );
+  // ctx.subscriptions.push(
+  //   vscode.commands.registerCommand(COMMAND_API_URL, function () {
+  //     wakatime.promptForApiUrl();
+  //   }),
+  // );
 
   ctx.subscriptions.push(
     vscode.commands.registerCommand(COMMAND_DEBUG, function () {
@@ -45,8 +43,8 @@ export function activate(ctx: vscode.ExtensionContext) {
       wakatime.promptToDisable();
     }),
   );
-
   ctx.subscriptions.push(
+
     vscode.commands.registerCommand(COMMAND_STATUS_BAR_ENABLED, function () {
       wakatime.promptStatusBarIcon();
     }),
