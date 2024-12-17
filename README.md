@@ -1,4 +1,10 @@
-# WakaTime for Visual Studio Code
+# BetterWakatime (WakaTime for Visual Studio Code)
+
+**This is a WIP!**
+This is a fork of the WakaTime for Visual Studio Code extension.
+This fork aims to fulfill two goals:
+1. Remove bloat/tech debt from the original WakaTime extension
+2. Add multi-server support.
 
 [![Version](https://img.shields.io/visual-studio-marketplace/v/WakaTime.vscode-wakatime.png?style=flat-square&color=007ec6&label=marketplace)](https://marketplace.visualstudio.com/items?itemName=WakaTime.vscode-wakatime)
 [![Installs](https://img.shields.io/visual-studio-marketplace/i/WakaTime.vscode-wakatime.png?style=flat-square&color=007ec6)](https://marketplace.visualstudio.com/items?itemName=WakaTime.vscode-wakatime)
