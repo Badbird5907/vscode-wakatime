@@ -8,6 +8,26 @@ This fork aims to fulfill two goals:
 
 I do plan to create a completely custom plugin implementing the [API spec](https://wakatime.com/developers) when I have more time.
 
+To configure this plugin, add the following snippet to your vscode `settings.json`:
+```json
+{
+  "wakatime.apiConfig": [
+        {
+            "apiUrl": "https://wakatime.example.com/api",
+            "apiKey": "api-key"
+        },
+        {
+            "apiUrl": "https://wakapi.dev/api",
+            "apiKey": "another-api-key"
+        }
+    ],
+}
+```
+
+
+
+
+
 [![Version](https://img.shields.io/visual-studio-marketplace/v/WakaTime.vscode-wakatime.png?style=flat-square&color=007ec6&label=marketplace)](https://marketplace.visualstudio.com/items?itemName=WakaTime.vscode-wakatime)
 [![Installs](https://img.shields.io/visual-studio-marketplace/i/WakaTime.vscode-wakatime.png?style=flat-square&color=007ec6)](https://marketplace.visualstudio.com/items?itemName=WakaTime.vscode-wakatime)
 [![WakaTime](https://wakatime.com/badge/github/wakatime/vscode-wakatime.png?style=flat-square&branch=master)](https://wakatime.com/badge/github/wakatime/vscode-wakatime)
