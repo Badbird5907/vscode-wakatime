@@ -8,7 +8,15 @@ This fork aims to fulfill two goals:
 
 I do plan to create a completely custom plugin implementing the [API spec](https://wakatime.com/developers) when I have more time.
 
-To configure this plugin, add the following snippet to your vscode `settings.json`:
+# Installation
+1. [Download](https://github.com/Badbird5907/better-wakatime/releases/tag/24.9.2) the .vsix file from the GitHub Release
+2. Go to `Extensions > ...` (See below image)
+4. Click on Install from VSIX
+5. Select the .vsix file you downloaded
+6. Open the Command Pallette
+7. Go to `Preferences: Open User Settings (JSON)`
+8. Add (and configure) the following sinppet
+
 ```json
 {
   "wakatime.apiConfig": [
@@ -23,13 +31,6 @@ To configure this plugin, add the following snippet to your vscode `settings.jso
     ],
 }
 ```
-
-# Installation
-1. [Download](https://github.com/Badbird5907/better-wakatime/releases/tag/24.9.2) the .vsix file from the GitHub Release
-2. Go to `Extensions > ...`
-4. Click on Install from VSIX
-5. Select the .vsix file you downloaded
-6. Profit.
 
 
 ![image](https://github.com/user-attachments/assets/f20423bd-1048-4f39-83e8-d77ff2195f54)
