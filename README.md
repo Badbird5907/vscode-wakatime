@@ -3,8 +3,8 @@
 **This is a WIP!**
 This is a fork of the WakaTime for Visual Studio Code extension.
 This fork aims to fulfill two goals:
-1. Remove bloat/tech debt from the original WakaTime extension
-2. Add multi-server support.
+1. Add multi-server support. (Send data to multiple wakatime servers)
+2. Remove bloat/tech debt from the original WakaTime extension (remove the CLI dependency, remove dead code, etc...)
 
 I do plan to create a completely custom plugin implementing the [API spec](https://wakatime.com/developers) when I have more time.
 
@@ -25,7 +25,7 @@ To configure this plugin, add the following snippet to your vscode `settings.jso
 ```
 
 
-
+----------
 
 
 [![Version](https://img.shields.io/visual-studio-marketplace/v/WakaTime.vscode-wakatime.png?style=flat-square&color=007ec6&label=marketplace)](https://marketplace.visualstudio.com/items?itemName=WakaTime.vscode-wakatime)
